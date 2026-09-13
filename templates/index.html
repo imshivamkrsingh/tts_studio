@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vocalize — text to speech studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="page">
+
+  <header class="hero">
+    <div class="hero-mark">
+      <h1>Vocalize</h1>
+      <svg class="wordmark-wave" id="idleWave" viewBox="0 0 220 24" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </div>
+    <p class="hero-tag">Type something. Choose a voice. Hear it read back.</p>
+  </header>
+
+  <main class="layout">
+
+    <!-- STUDIO -->
+    <section class="studio" aria-label="Text to speech studio">
+
+      <label class="field-label" for="text">What should it say?</label>
+      <textarea id="text" maxlength="{{ max_chars }}" rows="7"
+        placeholder="Paste or type the text you want spoken aloud&hellip;"></textarea>
+      <div class="char-row">
+        <span id="charCount">0</span> / {{ max_chars }}
+      </div>
+
+      <!-- Voice picker -->
+      <div class="voice-block">
+        <div class="control">
+          <label class="field-label" for="language">Language</label>
+          <select id="language"></select>
+        </div>
+
+        <div class="control">
+          <span class="field-label">Voice</span>
+          <div class="gender-toggle" role="group" aria-label="Voice gender">
+            <button type="button" class="gender-btn active" data-gender="Female">Female</button>
+            <button type="button" class="gender-btn" data-gender="Male">Male</button>
+          </div>
+        </div>
+
+        <div class="control">
+          <label class="field-label" for="voiceName">Specific voice</label>
+          <select id="voiceName"></select>
+        </div>
+      </div>
+
+      <!-- Pacing + pitch -->
+      <div class="preset-block">
+        <div class="control">
+          <span class="field-label">Pacing</span>
+          <div class="segmented" id="pacingGroup">
+            {% for p in pacing_presets %}
+            <button type="button" class="segment {% if p.default %}active{% endif %}" data-value="{{ p.value }}">{{ p.label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="control">
+          <span class="field-label">Pitch</span>
+          <div class="segmented" id="pitchGroup">
+            {% for p in pitch_presets %}
+            <button type="button" class="segment {% if p.default %}active{% endif %}" data-value="{{ p.value }}">{{ p.label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <button id="generateBtn" class="primary-btn">
+        <span id="generateLabel">Generate speech</span>
+      </button>
+      <p class="error" id="errorMsg" role="alert"></p>
+
+      <!-- Player -->
+      <div class="player" id="player" hidden>
+
+        <div class="player-head">
+          <div class="now-playing">
+            <span id="nowPlayingVoice">—</span>
+            <span class="dot">·</span>
+            <span id="nowPlayingSpec">{{ audio_spec }}</span>
+          </div>
+          <div class="time" id="timeDisplay">0:00 / 0:00</div>
+        </div>
+
+        <canvas id="waveform" width="600" height="64"></canvas>
+
+        <div class="seek-bar" id="seekBar">
+          <div class="seek-fill" id="seekFill"></div>
+          <div class="seek-thumb" id="seekThumb"></div>
+        </div>
+
+        <div class="transport">
+          <button class="icon-btn" id="restartBtn" title="Restart" aria-label="Restart">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 5V1L7 6l5 5V7a5 5 0 11-5 5H5a7 7 0 107-7z" fill="currentColor"/></svg>
+          </button>
+          <button class="icon-btn" id="backBtn" title="Back 5s" aria-label="Back 5 seconds">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path d="M11 5L4 12l7 7V5zM18 5l-7 7 7 7V5z" fill="currentColor"/></svg>
+          </button>
+          <button class="play-btn" id="playBtn" aria-label="Play">
+            <svg id="playIcon" viewBox="0 0 24 24" width="18" height="18"><path d="M6 4l14 8-14 8z" fill="currentColor"/></svg>
+            <svg id="pauseIcon" viewBox="0 0 24 24" width="18" height="18" hidden><path d="M6 4h4v16H6zM14 4h4v16h-4z" fill="currentColor"/></svg>
+          </button>
+          <button class="icon-btn" id="forwardBtn" title="Forward 5s" aria-label="Forward 5 seconds">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path d="M13 5l7 7-7 7V5zM6 5l7 7-7 7V5z" fill="currentColor"/></svg>
+          </button>
+          <button class="icon-btn" id="loopBtn" title="Loop" aria-label="Toggle loop">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path d="M17 2l4 4-4 4M3 11V9a4 4 0 014-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+
+          <div class="volume">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/></svg>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1">
+          </div>
+
+          <a id="downloadLink" class="export-btn" download title="Export MP3">
+            Export MP3
+          </a>
+        </div>
+      </div>
+      <audio id="audioEl" hidden></audio>
+
+    </section>
+
+    <!-- RECENT -->
+    <aside class="recent" aria-label="Recent generations">
+      <h2>Recent</h2>
+      <ul id="historyList" class="history-list"></ul>
+      <p class="empty-state" id="emptyState">Nothing yet. Your generated lines will show up here.</p>
+    </aside>
+
+  </main>
+
+</div>
+
+<script id="voiceData" type="application/json">{{ voices | tojson }}</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
